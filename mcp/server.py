@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from tavily import TavilyClient
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 mcp = FastMCP("foundations-mcp")
 tavily_client = TavilyClient()

@@ -9,7 +9,7 @@ from langchain.agents import create_agent
 from langchain.messages import HumanMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 SERVER_PATH = Path(__file__).with_name("server.py")
 
