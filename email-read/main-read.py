@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 from langchain.agents import AgentState, create_agent
