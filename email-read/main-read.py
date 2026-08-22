@@ -5,7 +5,13 @@ from dotenv import load_dotenv
 from langchain.agents import AgentState, create_agent
 from langchain.messages import ToolMessage
 from langchain.tools import ToolRuntime, tool
-from langchain.agents.middleware import ModelRequest, ModelResponse, wrap_model_call
+from langchain.agents.middleware import (
+	HumanInTheLoopMiddleware,
+	ModelRequest,
+	ModelResponse,
+	dynamic_prompt,
+	wrap_model_call,
+)
 from langgraph.types import Command
 
 load_dotenv()
@@ -65,3 +71,30 @@ async def dynamic_tool_call(
 	"""Expose protected tools only after successful authentication."""
 	tools = [check_inbox, send_email] if request.state.get("authenticated") else [authenticate]
 	return await handler(request.override(tools=tools))
+
+
+@dynamic_prompt
+def dynamic_prompt_func(request: ModelRequest) -> str:
+	"""Change the assistant instructions with the authentication state."""
+	if request.state.get("authenticated"):
+		return "You are a helpful assistant that can check the inbox and send emails."
+	return "You are a helpful assistant that can authenticate users."
+
+
+agent = create_agent(
+	"gpt-5-nano",
+	tools=[authenticate, check_inbox, send_email],
+	state_schema=AuthenticatedState,
+	context_schema=EmailContext,
+	middleware=[
+		dynamic_tool_call,
+		dynamic_prompt_func,
+		HumanInTheLoopMiddleware(
+			interrupt_on={
+				"authenticate": False,
+				"check_inbox": False,
+				"send_email": True,
+			}
+		),
+	],
+)
