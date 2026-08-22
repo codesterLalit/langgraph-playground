@@ -1,3 +1,5 @@
+import argparse
+import asyncio
 from dataclasses import dataclass
 from typing import Callable
 
@@ -98,3 +100,59 @@ agent = create_agent(
 		),
 	],
 )
+
+
+def print_approval_request(interrupts: list[Any]) -> None:
+	"""Display the pending tool request before asking the user for approval."""
+	for interrupt in interrupts:
+		value = interrupt.value
+		for action in value.get("action_requests", []):
+			print(f"\nApproval required for: {action['name']}")
+			print(f"Arguments: {action['args']}")
+
+
+async def run_conversation(question: str, thread_id: str) -> str:
+	config = {"configurable": {"thread_id": thread_id}}
+	context = EmailContext()
+	result = await agent.ainvoke(
+		{"messages": [{"role": "user", "content": question}]},
+		config=config,
+		context=context,
+	)
+
+	while "__interrupt__" in result:
+		print_approval_request(result["__interrupt__"])
+		decision = input("Approve this action? [y/N]: ").strip().lower()
+		if decision in {"y", "yes"}:
+			resume = {"decisions": [{"type": "approve"}]}
+		else:
+			resume = {
+				"decisions": [
+					{"type": "reject", "message": "The user rejected this action."}
+				]
+			}
+		result = await agent.ainvoke(
+			Command(resume=resume),
+			config=config,
+			context=context,
+		)
+
+	return str(result["messages"][-1].content)
+
+
+def main() -> None:
+	parser = argparse.ArgumentParser(
+		description="Read an inbox and send replies with an authenticated email agent."
+	)
+	parser.add_argument("question", help="Request for the email assistant.")
+	parser.add_argument(
+		"--thread-id",
+		default="email-read",
+		help="Conversation identifier used by the agent checkpoint.",
+	)
+	args = parser.parse_args()
+	print(asyncio.run(run_conversation(args.question, args.thread_id)))
+
+
+if __name__ == "__main__":
+	main()
