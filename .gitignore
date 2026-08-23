@@ -1,0 +1,5 @@
+# Local credentials and application data
+.env
+/data/
+**/__pycache__/
+*.py[cod]
