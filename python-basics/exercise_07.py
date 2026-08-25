@@ -1,24 +1,27 @@
 from typing import Protocol
 
-class SmsSender(Protocol):
-    def sendSms(self, message:str) -> None: ...
-    def bulkSms(self, recipient_list: list[str], message: str) -> bool: ...
+class Repository(Protocol):
+    def save(self, key:str, value: str) -> None: ...
+    def get(self, key:str) -> str: ...
 
-def sendSingleSms(sender: SmsSender, message: str):
-    sender.sendSms(message=message)
+def save_info(repository: Repository, key:str, value:str):
+    repository.save(key, value)
 
-def sendGroupSms(sender: SmsSender, recipient_list: list[str], message: str):
-    sender.bulkSms(recipient_list=recipient_list, message=message)
+def get_info(repository: Repository, key:str):
+    return repository.get(key)
+
+
+class InMemoryRepo:
+    def __init__(self) -> None:
+         self.store: dict[str, str] = {}
+         
+    def save(self, key, value):
+        self.store[key] = value
     
-
-class InternationalSms:
-    def sendSms(self, message: str):
-        print(f"Messeage sent: {message}")
-
-class NationalSms:
-    def bulkSms(self, recipient_list: list[str], message: str):
-        for item in recipient_list:
-            print(f"Message sent to {item}: {message}")
-
-sendSingleSms(InternationalSms(), "Welcome to global")
-sendGroupSms(NationalSms(), ["Global", "Khalti", "esewa", "Barclys"], "Your account has been renewed.")
+    def get(self, key:str):
+        return self.store.get(key)
+    
+repository = InMemoryRepo()
+save_info(repository, "name", "Batman")
+new_value = get_info(repository, "name")
+print(f"value: {new_value}")
