@@ -17,8 +17,18 @@ class Retry:
         self.max_attempts = max_attempts
     
     def __call__(self) -> bool:
-        for attempt in range(1, self.max_attempts):
+        for attempt in range(1, self.max_attempts + 1):
             success = self.function()
             
             if success:
-                print(f"Sucess")
+                print(f"Sucess on attempt: {attempt}")
+                return True
+            print(f"Failed on attempt {attempt}")
+        raise MaxRetriesExceededError(f"Function failed after {self.max_attempts} attempts")
+
+retry = Retry(fake_test, max_attempts=3)
+
+try:
+    retry()
+except MaxRetriesExceededError as error:
+    print(error)
