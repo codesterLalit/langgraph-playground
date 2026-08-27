@@ -24,6 +24,13 @@ async def concurrent_calls() -> list[str]:
     
     return list(result)
 
+async def group() -> list[str]:
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(fake_service("Gemini", 4))
+        task2 = tg.create_task(fake_service("Chatgpt", 1))
+        task3 = tg.create_task(fake_service("Claude", 2))
+    return [task1.result(), task2.result(), task3.result()]
+
 async def main() -> None:
     start  = time.perf_counter()
     sequential_results = await sequential_calls()
@@ -33,10 +40,19 @@ async def main() -> None:
     concurrent_results = await concurrent_calls()
     concurrent_time = time.perf_counter() - start
     
+    start  = time.perf_counter()
+    group_exec_result = await group()
+    group_time = time.perf_counter() - start
+    
+    
     print(f"Sequential results: {sequential_results}")
     print(f"Sequential time: {sequential_time:.2f} secons ")
     
     print(f"concurrent results: {concurrent_results}")
     print(f"concurrent time: {concurrent_time: .2f} seconds")
-
+    
+    # test
+    print(f"Group result: {group_exec_result}")
+    print(f"group timeL {group_time:.2f}")
+        
 asyncio.run(main())
