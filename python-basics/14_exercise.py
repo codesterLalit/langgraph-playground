@@ -1,42 +1,63 @@
-import sqlite3
-from types import TracebackType
-from typing import Any, Literal
+from dataclasses import dataclass
+from collections.abc import Callable
+import time
 
-class ManagedSqlite:
-    def __init__(self, db_name: str):
-        self.db_name = db_name
-        self.conn:sqlite3.Connection | None = None
-        
-    def __enter__(self) -> sqlite3.Connection:
-        print(f"[Setup] Opening connection to {self.db_name}")
-        self.conn = sqlite3.connect(self.db_name)
-        return self.conn
+@dataclass
+class Request:
+    user: str
 
-    def __exit__(
-        self, 
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-            ) -> Literal[False]:
-        if self.conn is not None:
-            if exc_type is None:
-                self.conn.commit()
-            else:
-                self.conn.rollback()
-                
-            print(f"[TEARDOWN] Closing connection to {self.db_name}")
-            self.conn.close()
-        return False
+@dataclass
+class Response:
+    msg: str
+    
+def core_app(req: Request) -> Response:
+    return Response(msg=f"Hello, {req.user}!")
 
-try:
-    with ManagedSqlite(":memory:") as db:
-        db.execute("CREATE TABLE logs (id INT, message TEXT)")
-        db.execute("INSERT INTO logs (id, message) VALUES (?, ?)", (1, "Saving"))
-        
-        cursor = db.execute("SELECT * FROM logs WHERE id =?", (1, ))
-        row = cursor.fetchone()
-        print(f"logs record : {row}")
-        
-        print("[EXECUTE] Table created successfully")
-except ValueError as error:
-    print(f"Caught error: {error}")
+def auth_middleware(req: Request, next_stage: Callable[[Request], Response]) -> Response:
+    if req.user == "anonymous":
+        return Response(msg="401 Unauthorized")
+    return next_stage(req)
+
+def log_middleware(req: Request, next_stage: Callable[[Request], Response]) -> Response:
+    print(f"[LOG] Processing for {req.user}")
+    res = next_stage(req)
+    print(f"[LOG] Done: {res.msg}")
+    return res
+
+def timing_middleware(req: Request, next_stage: Callable[[Request], Response]) -> Response:
+    start = time.perf_counter()
+    res = next_stage(req)
+    total_time = time.perf_counter() - start
+    print(f"[TIMING] total time taken: {total_time:.2f}")
+    return res
+
+def build_pipeline(
+    handler: Callable[[Request], Response],
+    middlewares: list[Callable[[Request, Callable[[Request], Response]], Response]]
+) -> Callable[[Request], Response]:
+    current_handler = handler
+    
+    for mw in reversed(middlewares):
+        next_fn = current_handler
+
+        def wrapped(
+            req: Request,
+            m: Callable[[Request, Callable[[Request], Response]], Response] = mw,
+            n: Callable[[Request], Response] = next_fn,
+        ) -> Response:
+            return m(req, n)
+
+        current_handler = wrapped
+            
+    return current_handler
+
+pipeline = build_pipeline(
+    handler=core_app,
+    middlewares=[log_middleware, auth_middleware, timing_middleware]
+)
+
+print("--- TEST 1: Authorized User ---")
+print(pipeline(Request("Alice")))
+
+print("\n--- TEST 2: Anonymous User ---")
+print(pipeline(Request("anonymous")))
